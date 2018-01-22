@@ -1,6 +1,10 @@
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
+import org.apache.hadoop.hbase.filter.CompareFilter;
+import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.filter.PrefixFilter;
+import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.*;
@@ -203,8 +207,37 @@ public class HBaseTPCC {
 
 
     public List<String> query1(String warehouseId, String districtId, String startDate, String endDate) throws IOException {
+        HConnection connection = HConnectionManager.createConnection(config);
+        HTable ordersTable = new HTable(TableName.valueOf(Bytes.toBytes(ordersTableName)), connection);
         //TO IMPLEMENT
-        System.exit(-1);
+//        Filter filter1 = new SingleColumnValueFilter(
+//                Bytes.toBytes(ordersColumnFamilyName),
+//                Bytes.toBytes("O_ENTRY_D"),
+//                CompareFilter.CompareOp.GREATER_OR_EQUAL,
+//                Bytes.toBytes(startDate)
+//        );
+        byte[] startAndEndKey = getKey(new String[]{warehouseId, districtId}, new int[]{0, 1});
+        Scan scan = new Scan(startAndEndKey);
+        PrefixFilter prefixFilter = new PrefixFilter(startAndEndKey);
+        scan.setFilter(prefixFilter);
+
+        ResultScanner resultScanner = ordersTable.getScanner(scan);
+        Result res = resultScanner.next();
+        while (res != null && !res.isEmpty())
+        {
+            byte[] costumerID = res.getValue(Bytes.toBytes(ordersColumnFamilyName), Bytes.toBytes("O_C_ID"));
+            byte[] orderID = res.getValue(Bytes.toBytes(ordersColumnFamilyName), Bytes.toBytes("O_ID"));
+            byte[] warehouseID = res.getValue(Bytes.toBytes(ordersColumnFamilyName), Bytes.toBytes("O_W_ID"));
+            byte[] districtID = res.getValue(Bytes.toBytes(ordersColumnFamilyName), Bytes.toBytes("O_D_ID"));
+            String costumerString = new String(costumerID, "US-ASCII");
+            String orderIDString = new String(orderID, "US-ASCII");
+            String whString = new String(warehouseID, "US-ASCII");
+            String dsIDString = new String(districtID, "US-ASCII");
+            System.out.println(whString + " " + dsIDString + " " +orderIDString + " "+ costumerString);
+            res = resultScanner.next();
+        }
+
+        System.exit(0);
         return null;
 
     }
