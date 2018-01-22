@@ -137,7 +137,17 @@ public class HBaseTPCC {
                 new int [] {2,1,0}
         );
 
-        //HISTORY -> TODO
+        loadTableWrapper(
+                connection,
+                historyTableName,
+                historyColumnFamilyName,
+                folder,
+                "history.csv",
+                new String[]{
+                        "H_C_ID", "H_C_D_ID", "H_C_W_ID", "H_D_ID", "H_W_ID", "H_DATE", "H_AMOUNT", "H_DATA"
+                },
+                new int [] {4,3,5}
+        );
 
         loadTableWrapper(
                 connection,
@@ -207,8 +217,9 @@ public class HBaseTPCC {
 
 
     public List<String> query1(String warehouseId, String districtId, String startDate, String endDate) throws IOException {
+        List<String> customerIDList = new LinkedList<>();
         HConnection connection = HConnectionManager.createConnection(config);
-        HTable ordersTable = new HTable(TableName.valueOf(Bytes.toBytes(ordersTableName)), connection);
+        HTable ordersTable = new HTable(TableName.valueOf(Bytes.toBytes(historyTableName)), connection);
         //TO IMPLEMENT
 //        Filter filter1 = new SingleColumnValueFilter(
 //                Bytes.toBytes(ordersColumnFamilyName),
@@ -216,29 +227,33 @@ public class HBaseTPCC {
 //                CompareFilter.CompareOp.GREATER_OR_EQUAL,
 //                Bytes.toBytes(startDate)
 //        );
-        byte[] startAndEndKey = getKey(new String[]{warehouseId, districtId}, new int[]{0, 1});
-        Scan scan = new Scan(startAndEndKey);
-        PrefixFilter prefixFilter = new PrefixFilter(startAndEndKey);
-        scan.setFilter(prefixFilter);
+        byte[] startKey = getKey(new String[]{warehouseId, districtId, startDate}, new int[]{0, 1, 2});
+        byte[] endKey = getKey(new String[]{warehouseId, districtId, endDate}, new int[]{0, 1, 2});
+
+        Scan scan = new Scan(startKey, endKey);
+//        PrefixFilter prefixFilter = new PrefixFilter(startAndEndKey);
+//        scan.setFilter(prefixFilter);
 
         ResultScanner resultScanner = ordersTable.getScanner(scan);
         Result res = resultScanner.next();
         while (res != null && !res.isEmpty())
         {
-            byte[] costumerID = res.getValue(Bytes.toBytes(ordersColumnFamilyName), Bytes.toBytes("O_C_ID"));
-            byte[] orderID = res.getValue(Bytes.toBytes(ordersColumnFamilyName), Bytes.toBytes("O_ID"));
-            byte[] warehouseID = res.getValue(Bytes.toBytes(ordersColumnFamilyName), Bytes.toBytes("O_W_ID"));
-            byte[] districtID = res.getValue(Bytes.toBytes(ordersColumnFamilyName), Bytes.toBytes("O_D_ID"));
-            String costumerString = new String(costumerID, "US-ASCII");
-            String orderIDString = new String(orderID, "US-ASCII");
+            byte[] warehouseID = res.getValue(Bytes.toBytes(historyColumnFamilyName), Bytes.toBytes("H_W_ID"));
+            byte[] districtID = res.getValue(Bytes.toBytes(historyColumnFamilyName), Bytes.toBytes("H_D_ID"));
+            byte[] orderDate = res.getValue(Bytes.toBytes(historyColumnFamilyName), Bytes.toBytes("H_DATE"));
+            byte[] customerID = res.getValue(Bytes.toBytes(historyColumnFamilyName), Bytes.toBytes("H_C_ID"));
+
             String whString = new String(warehouseID, "US-ASCII");
             String dsIDString = new String(districtID, "US-ASCII");
-            System.out.println(whString + " " + dsIDString + " " +orderIDString + " "+ costumerString);
+            String orderDateString = new String(orderDate, "US-ASCII");
+            String customerIDString = new String(customerID, "US-ASCII");
+            System.out.println(whString + " " + dsIDString + " " + orderDateString + " " + customerIDString);
+
+            customerIDList.add(customerIDString);
             res = resultScanner.next();
         }
 
-        System.exit(0);
-        return null;
+        return customerIDList;
 
     }
 
