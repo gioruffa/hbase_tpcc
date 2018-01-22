@@ -12,6 +12,32 @@ public class HBaseTPCC {
     private Configuration config;
     private HBaseAdmin hBaseAdmin;
 
+    String warehouseTableName = "warehouse";
+    String warehouseColumnFamilyName = "warehousecf";
+
+    String districtTableName = "district";
+    String districtColumnFamilyName = "districtcf";
+
+    String itemTableName = "item";
+    String itemColumnFamilyName = "itemcf";
+
+    String new_orderTableName = "new_order";
+    String new_orderColumnFamilyName = "new_ordercf";
+
+    String ordersTableName = "orders";
+    String ordersColumnFamilyName = "orderscf";
+
+    String historyTableName = "history";
+    String historyColumnFamilyName = "historycf";
+
+    String customerTableName = "customer";
+    String customerColumnFamilyName = "customercf";
+
+    String stockTableName = "stock";
+    String stockColumnFamilyName = "stockcf";
+
+    String order_lineTableName = "order_line";
+    String order_lineColumnFamilyName = "order_linecf";
     /**
      * The Constructor. Establishes the connection with HBase.
      * @param zkHost
@@ -26,8 +52,21 @@ public class HBaseTPCC {
     }
 
     public void createTPCCTables() throws IOException {
-        //TO IMPLEMENT
-        System.exit(-1);
+        /**
+         * Wharehouse
+         */
+        createTableWrapper(warehouseTableName ,new String[] {warehouseColumnFamilyName}, new Integer[]{3});
+        createTableWrapper(districtTableName,new String[] {districtColumnFamilyName}, new Integer[]{3});
+        createTableWrapper(itemTableName,new String[] {itemColumnFamilyName}, new Integer[]{3});
+        createTableWrapper(new_orderTableName,new String[] {new_orderColumnFamilyName}, new Integer[]{3});
+        createTableWrapper(ordersTableName,new String[] {ordersColumnFamilyName}, new Integer[]{3});
+        createTableWrapper(historyTableName,new String[] {historyColumnFamilyName}, new Integer[]{3});
+        createTableWrapper(customerTableName,new String[] {customerColumnFamilyName}, new Integer[]{3});
+        createTableWrapper(stockTableName,new String[] {stockColumnFamilyName}, new Integer[]{3});
+        createTableWrapper(order_lineTableName,new String[] {order_lineColumnFamilyName}, new Integer[]{3});
+
+
+        System.exit(0);
     }
 
     public void loadTables(String folder)throws IOException{
@@ -147,6 +186,28 @@ public class HBaseTPCC {
                     "d) If query3: warehouseId districtId customerId " +
                     "e) If query4: warehouseId listOfdistrictId");
             System.exit(-1);
+        }
+
+    }
+
+    void createTableWrapper(String tableNameString, String[] columnFamilyNameString, Integer[] maxVersions) throws IOException {
+        byte[] tableName = Bytes.toBytes(tableNameString);
+        HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(tableName));
+        for(int i =0 ; i < columnFamilyNameString.length; i++)
+        {
+            byte[] columnFamilyName = Bytes.toBytes(columnFamilyNameString[i]);
+            HColumnDescriptor columnFamilyDescriptor = new HColumnDescriptor(
+                    columnFamilyName
+            );
+            columnFamilyDescriptor.setMaxVersions(maxVersions[i]);
+            tableDescriptor.addFamily(columnFamilyDescriptor);
+        }
+        try {
+            hBaseAdmin.createTable(tableDescriptor);
+        }
+        catch (TableExistsException ex)
+        {
+            System.err.println(String.format("Table %s already exists, skipping.", tableNameString));
         }
 
     }
