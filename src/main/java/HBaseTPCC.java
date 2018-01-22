@@ -1,10 +1,7 @@
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
-import org.apache.hadoop.hbase.filter.CompareFilter;
-import org.apache.hadoop.hbase.filter.Filter;
-import org.apache.hadoop.hbase.filter.PrefixFilter;
-import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
+import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.*;
@@ -215,18 +212,14 @@ public class HBaseTPCC {
     }
 
 
-
     public List<String> query1(String warehouseId, String districtId, String startDate, String endDate) throws IOException {
         List<String> customerIDList = new LinkedList<>();
         HConnection connection = HConnectionManager.createConnection(config);
         HTable ordersTable = new HTable(TableName.valueOf(Bytes.toBytes(historyTableName)), connection);
-        //TO IMPLEMENT
-//        Filter filter1 = new SingleColumnValueFilter(
-//                Bytes.toBytes(ordersColumnFamilyName),
-//                Bytes.toBytes("O_ENTRY_D"),
-//                CompareFilter.CompareOp.GREATER_OR_EQUAL,
-//                Bytes.toBytes(startDate)
-//        );
+
+        //given the structure of our key we can just use the range
+        //it automatically excludes the endKey
+
         byte[] startKey = getKey(new String[]{warehouseId, districtId, startDate}, new int[]{0, 1, 2});
         byte[] endKey = getKey(new String[]{warehouseId, districtId, endDate}, new int[]{0, 1, 2});
 
@@ -309,10 +302,46 @@ public class HBaseTPCC {
         return result;
     }
 
-    public int query4(String warehouseId, String[] districtIds) throws IOException {
+    public List<Integer> query4(String warehouseId, String[] districtIds) throws IOException {
+        List<Integer> customerIds = new LinkedList<>();
         //TO IMPLEMENT
-        System.exit(-1);
-        return 0;
+        byte [] startKey = getKey(new String[] {warehouseId}, new int [] {0});
+        byte [] endKey = getKey(new String[] {String.valueOf(Integer.valueOf(warehouseId) + 1)}, new int [] {0});
+
+
+        HConnection connection = HConnectionManager.createConnection(config);
+        HTable customerTable = new HTable(TableName.valueOf(Bytes.toBytes(customerTableName)), connection);
+
+        Scan scan = new Scan(startKey,endKey);
+//        scan.addColumn(Bytes.toBytes(customerColumnFamilyName),Bytes.toBytes("C_ID"));
+
+        FilterList filterList = new FilterList(FilterList.Operator.MUST_PASS_ONE);
+
+        for(String district : districtIds)
+        {
+            Filter filter = new SingleColumnValueFilter(
+              Bytes.toBytes(customerColumnFamilyName),
+                    Bytes.toBytes("C_D_ID"),
+                    CompareFilter.CompareOp.EQUAL,
+                    Bytes.toBytes(district)
+            );
+            filterList.addFilter(filter);
+        }
+
+        scan.setFilter(filterList);
+
+        ResultScanner scanner = customerTable.getScanner(scan);
+
+        Result res = scanner.next();
+        while (res != null && !res.isEmpty())
+        {
+            byte[] customerID = res.getValue(Bytes.toBytes(customerColumnFamilyName), Bytes.toBytes("C_ID"));
+            customerIds.add(Integer.valueOf(new String(customerID, "US-ASCII")));
+
+            res = scanner.next();
+        }
+
+        return customerIds;
     }
 
     public static void main(String[] args) throws IOException {
@@ -374,7 +403,8 @@ public class HBaseTPCC {
                         "3) warehouseId 4) listOfDistrictIds");
                 System.exit(-1);
             }
-            System.out.println("There are "+hBaseTPCC.query4(args[2], args[3].split(","))+" customers that belong to warehouse "+args[2]+" of districts "+args[3]+".");
+            //modified to print the size
+            System.out.println("There are "+hBaseTPCC.query4(args[2], args[3].split(",")).size()+" customers that belong to warehouse "+args[2]+" of districts "+args[3]+".");
         }
         else{
             System.out.println("Error: 1) ZK_HOST:ZK_PORT, 2)action [createTables, loadTables, query1, query2, query3, query4], 3)Extra parameters for loadTables and queries:" +
