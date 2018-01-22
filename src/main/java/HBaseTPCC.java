@@ -60,15 +60,15 @@ public class HBaseTPCC {
         /**
          * Wharehouse
          */
-        createTableWrapper(warehouseTableName ,new String[] {warehouseColumnFamilyName}, new Integer[]{3});
-        createTableWrapper(districtTableName,new String[] {districtColumnFamilyName}, new Integer[]{3});
-        createTableWrapper(itemTableName,new String[] {itemColumnFamilyName}, new Integer[]{3});
-        createTableWrapper(new_orderTableName,new String[] {new_orderColumnFamilyName}, new Integer[]{3});
-        createTableWrapper(ordersTableName,new String[] {ordersColumnFamilyName}, new Integer[]{3});
-        createTableWrapper(historyTableName,new String[] {historyColumnFamilyName}, new Integer[]{3});
-        createTableWrapper(customerTableName,new String[] {customerColumnFamilyName}, new Integer[]{3});
-        createTableWrapper(stockTableName,new String[] {stockColumnFamilyName}, new Integer[]{3});
-        createTableWrapper(order_lineTableName,new String[] {order_lineColumnFamilyName}, new Integer[]{3});
+        createTableWrapper(warehouseTableName ,new String[] {warehouseColumnFamilyName}, new Integer[]{1});
+        createTableWrapper(districtTableName,new String[] {districtColumnFamilyName}, new Integer[]{1});
+        createTableWrapper(itemTableName,new String[] {itemColumnFamilyName}, new Integer[]{1});
+        createTableWrapper(new_orderTableName,new String[] {new_orderColumnFamilyName}, new Integer[]{1});
+        createTableWrapper(ordersTableName,new String[] {ordersColumnFamilyName}, new Integer[]{1});
+        createTableWrapper(historyTableName,new String[] {historyColumnFamilyName}, new Integer[]{1});
+        createTableWrapper(customerTableName,new String[] {customerColumnFamilyName}, new Integer[]{4});
+        createTableWrapper(stockTableName,new String[] {stockColumnFamilyName}, new Integer[]{1});
+        createTableWrapper(order_lineTableName,new String[] {order_lineColumnFamilyName}, new Integer[]{1});
         System.exit(0);
     }
 
@@ -247,7 +247,7 @@ public class HBaseTPCC {
             String dsIDString = new String(districtID, "US-ASCII");
             String orderDateString = new String(orderDate, "US-ASCII");
             String customerIDString = new String(customerID, "US-ASCII");
-            System.out.println(whString + " " + dsIDString + " " + orderDateString + " " + customerIDString);
+//            System.out.println(whString + " " + dsIDString + " " + orderDateString + " " + customerIDString);
 
             customerIDList.add(customerIDString);
             res = resultScanner.next();
@@ -258,14 +258,55 @@ public class HBaseTPCC {
     }
 
     public void query2(String warehouseId, String districtId, String customerId, String[] discounts) throws IOException {
-        //TO IMPLEMENT
-        System.exit(-1);
+        HConnection connection = HConnectionManager.createConnection(config);
+        HTable customerTable = new HTable(TableName.valueOf(Bytes.toBytes(customerTableName)),connection);
+
+
+        for (String discount : discounts)
+        {
+            Put put = new Put(getKey(
+                    new String[] {warehouseId, districtId, customerId},
+                    new int[] {0,1,2}
+            ));
+
+            put.add(
+                    Bytes.toBytes(customerColumnFamilyName),
+                    Bytes.toBytes("C_DISCOUNT"),
+                    Bytes.toBytes(discount)
+            );
+            customerTable.put(put);
+        }
+
+
+        System.exit(0);
     }
 
     public String[] query3(String warehouseId, String districtId, String customerId) throws IOException {
-        //TO IMPLEMENT
-        System.exit(-1);
-        return null;
+        List<String> discounts = new LinkedList<>();
+        HConnection connection = HConnectionManager.createConnection(config);
+        HTable customerTable = new HTable(TableName.valueOf(Bytes.toBytes(customerTableName)), connection);
+        Get get = new Get(
+                getKey(
+                        new String[]{warehouseId, districtId, customerId},
+                        new int[]{0, 1, 2})
+        );
+
+        get.addColumn(Bytes.toBytes(customerColumnFamilyName),Bytes.toBytes("C_DISCOUNT"));
+        get.setMaxVersions(4);
+
+        Result res = customerTable.get(get);
+        Cell current;
+        while(res != null && !res.isEmpty() && res.advance())
+        {
+            current = res.current();
+
+            byte[] discountValue = CellUtil.cloneValue(current);
+            discounts.add(new String(discountValue, "US-ASCII"));
+        }
+
+        String[] result = new String[discounts.size()];
+        discounts.toArray(result);
+        return result;
     }
 
     public int query4(String warehouseId, String[] districtIds) throws IOException {
@@ -384,7 +425,7 @@ public class HBaseTPCC {
         BufferedReader bufferedReader = new BufferedReader(new FileReader(inputCsv));
 
 
-        LinkedList<Put> putList = new LinkedList<>();
+        List<Put> putList = new LinkedList<>();
 
         String line;
         while ((line = bufferedReader.readLine()) != null) {
