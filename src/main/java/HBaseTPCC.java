@@ -4,8 +4,9 @@ import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.*;
-import java.util.Arrays;
-import java.util.List;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
 
 
 public class HBaseTPCC {
@@ -64,12 +65,28 @@ public class HBaseTPCC {
         createTableWrapper(customerTableName,new String[] {customerColumnFamilyName}, new Integer[]{3});
         createTableWrapper(stockTableName,new String[] {stockColumnFamilyName}, new Integer[]{3});
         createTableWrapper(order_lineTableName,new String[] {order_lineColumnFamilyName}, new Integer[]{3});
-
-
         System.exit(0);
     }
 
     public void loadTables(String folder)throws IOException{
+
+        HConnection connection = HConnectionManager.createConnection(config);
+
+
+        loadTableWrapper(
+                connection,
+                warehouseTableName,
+                warehouseColumnFamilyName,
+                folder,
+                "warehouse.csv",
+                new String[] {
+                        "W_ID", "W_NAME", "W_STREET_1", "W_STREET_2", "W_CITY", "W_STATE", "W_ZIP", "W_TAX", "W_YTD"
+                },
+                new int [] {0}
+        );
+
+
+
         //TO IMPLEMENT
         System.out.println(String.format("The folder is %s", folder));
         System.exit(-1);
@@ -209,6 +226,46 @@ public class HBaseTPCC {
         {
             System.err.println(String.format("Table %s already exists, skipping.", tableNameString));
         }
+
+    }
+
+    void loadTableWrapper(
+            HConnection connection,
+            String tableName,
+            String columnFamilyName,
+            String folderName,
+            String fileName,
+            String[] columnNames,
+            int[] keyIndexes
+            ) throws IOException {
+
+        //first we have to read the file
+        File inputCsv = new File(Paths.get(folderName,fileName).toString());
+        BufferedReader bufferedReader = new BufferedReader(new FileReader(inputCsv));
+
+
+        LinkedList<Put> putList = new LinkedList<>();
+
+        String line;
+        while ((line = bufferedReader.readLine()) != null) {
+
+
+            String [] tokens = line.split(",");
+            byte[] rowKey = getKey(tokens,keyIndexes);
+            Put put = new Put(rowKey);
+            for (int i=0; i<columnNames.length ; i++)
+            {
+                put.add(
+                        Bytes.toBytes(columnFamilyName),
+                        Bytes.toBytes(columnNames[i]),
+                        Bytes.toBytes(tokens[i])
+                );
+            }
+            putList.add(put);
+        }
+
+        HTable hTable = new HTable(TableName.valueOf(Bytes.toBytes(tableName)), connection);
+        hTable.put(putList);
 
     }
 
