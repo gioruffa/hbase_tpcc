@@ -202,6 +202,7 @@ public class HBaseTPCC {
      * @return The encoded key to be inserted in HBase
      */
     private byte[] getKey(String[] values, int[] keyTable) {
+        //It would be better to use leading zeroes for numeric values
         String keyString = "";
         for (int keyId : keyTable){
             keyString += values[keyId];
@@ -313,7 +314,7 @@ public class HBaseTPCC {
         HTable customerTable = new HTable(TableName.valueOf(Bytes.toBytes(customerTableName)), connection);
 
         Scan scan = new Scan(startKey,endKey);
-//        scan.addColumn(Bytes.toBytes(customerColumnFamilyName),Bytes.toBytes("C_ID"));
+//        scan.addColumn(Bytes.toBytes(customerColumnFamilyName),Bytes.toBytes("C_ID")); //IF I ADD THIS THE FILTER DOES NOT WORK!
 
         FilterList filterList = new FilterList(FilterList.Operator.MUST_PASS_ONE);
 
