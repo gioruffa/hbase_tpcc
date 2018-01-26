@@ -35,6 +35,9 @@ public class HBaseTPCC {
     String customerTableName = "customer";
     String customerColumnFamilyName = "customercf";
 
+    String customerSplittedTableName = "customer_splitted";
+    String customerSplittedColumnFamilyName = "customer_splittedcf";
+
     String stockTableName = "stock";
     String stockColumnFamilyName = "stockcf";
 
@@ -64,6 +67,44 @@ public class HBaseTPCC {
         createTableWrapper(ordersTableName,new String[] {ordersColumnFamilyName}, new Integer[]{1});
         createTableWrapper(historyTableName,new String[] {historyColumnFamilyName}, new Integer[]{1});
         createTableWrapper(customerTableName,new String[] {customerColumnFamilyName}, new Integer[]{4});
+
+        // some splitting for the customer table. each region will contain a given district in a given warehouse
+        // unfortunately, given the nature of the key generator there will be two district (1 and 10) in the same region
+        // this hould make the response time of query 4 faster as the full file scan needed by the filter will scan
+        // smaller files
+        byte [] [] customerSplits = new byte [] []
+                {
+                        Bytes.toBytes("11"),
+                        Bytes.toBytes("12"),
+                        Bytes.toBytes("13"),
+                        Bytes.toBytes("14"),
+                        Bytes.toBytes("15"),
+                        Bytes.toBytes("16"),
+                        Bytes.toBytes("17"),
+                        Bytes.toBytes("18"),
+                        Bytes.toBytes("19"),
+
+                        Bytes.toBytes("21"),
+                        Bytes.toBytes("22"),
+                        Bytes.toBytes("23"),
+                        Bytes.toBytes("24"),
+                        Bytes.toBytes("25"),
+                        Bytes.toBytes("26"),
+                        Bytes.toBytes("27"),
+                        Bytes.toBytes("28"),
+                        Bytes.toBytes("29"),
+
+                        Bytes.toBytes("31"),
+                        Bytes.toBytes("32"),
+                        Bytes.toBytes("33"),
+                        Bytes.toBytes("34"),
+                        Bytes.toBytes("35"),
+                        Bytes.toBytes("36"),
+                        Bytes.toBytes("37"),
+                        Bytes.toBytes("38"),
+                        Bytes.toBytes("39")
+                };
+        createTableWrapper(customerSplittedTableName, new String[] {customerSplittedColumnFamilyName}, new Integer[]{4}, customerSplits);
         createTableWrapper(stockTableName,new String[] {stockColumnFamilyName}, new Integer[]{1});
         createTableWrapper(order_lineTableName,new String[] {order_lineColumnFamilyName}, new Integer[]{1});
         System.exit(0);
@@ -162,6 +203,20 @@ public class HBaseTPCC {
 
         loadTableWrapper(
                 connection,
+                customerSplittedTableName,
+                customerSplittedColumnFamilyName,
+                folder,
+                "customer.csv",
+                new String[] {
+                        "C_ID", "C_D_ID", "C_W_ID", "C_FIRST", "C_MIDDLE", "C_LAST", "C_STREET_1",
+                        "C_STREET_2", "C_CITY", "C_STATE", "C_ZIP", "C_PHONE", "C_SINCE", "C_CREDIT", "C_CREDITLIM",
+                        "C_DISCOUNT", "C_BALANCE", "C_YTD_PAYMENT", "C_PAYMENT_CNT", "C_DELIVERY_CNT", "C_DATA"
+                },
+                new int [] {2,1,0}
+        );
+
+        loadTableWrapper(
+                connection,
                 stockTableName,
                 stockColumnFamilyName,
                 folder,
@@ -232,14 +287,14 @@ public class HBaseTPCC {
         Result res = resultScanner.next();
         while (res != null && !res.isEmpty())
         {
-            byte[] warehouseID = res.getValue(Bytes.toBytes(historyColumnFamilyName), Bytes.toBytes("H_W_ID"));
-            byte[] districtID = res.getValue(Bytes.toBytes(historyColumnFamilyName), Bytes.toBytes("H_D_ID"));
-            byte[] orderDate = res.getValue(Bytes.toBytes(historyColumnFamilyName), Bytes.toBytes("H_DATE"));
+//            byte[] warehouseID = res.getValue(Bytes.toBytes(historyColumnFamilyName), Bytes.toBytes("H_W_ID"));
+//            byte[] districtID = res.getValue(Bytes.toBytes(historyColumnFamilyName), Bytes.toBytes("H_D_ID"));
+//            byte[] orderDate = res.getValue(Bytes.toBytes(historyColumnFamilyName), Bytes.toBytes("H_DATE"));
             byte[] customerID = res.getValue(Bytes.toBytes(historyColumnFamilyName), Bytes.toBytes("H_C_ID"));
 
-            String whString = new String(warehouseID, "US-ASCII");
-            String dsIDString = new String(districtID, "US-ASCII");
-            String orderDateString = new String(orderDate, "US-ASCII");
+//            String whString = new String(warehouseID, "US-ASCII");
+//            String dsIDString = new String(districtID, "US-ASCII");
+//            String orderDateString = new String(orderDate, "US-ASCII");
             String customerIDString = new String(customerID, "US-ASCII");
 //            System.out.println(whString + " " + dsIDString + " " + orderDateString + " " + customerIDString);
 
@@ -304,6 +359,22 @@ public class HBaseTPCC {
     }
 
     public List<Integer> query4(String warehouseId, String[] districtIds) throws IOException {
+        return query4Generic(warehouseId, districtIds, customerTableName , customerColumnFamilyName);
+    }
+
+    public List<Integer> query5(String warehouseId, String[] districtIds) throws IOException {
+        return query4Generic(warehouseId, districtIds, customerSplittedTableName, customerSplittedColumnFamilyName);
+    }
+
+    /**
+     * Changed method name to use the same code for the query 5, which is the one with the splitted regions
+     * @param warehouseId
+     * @param districtIds
+     * @param tableName
+     * @return
+     * @throws IOException
+     */
+    public List<Integer> query4Generic(String warehouseId, String[] districtIds, String tableName, String columnFamilyName) throws IOException {
         List<Integer> customerIds = new LinkedList<>();
         //TO IMPLEMENT
         byte [] startKey = getKey(new String[] {warehouseId}, new int [] {0});
@@ -311,7 +382,7 @@ public class HBaseTPCC {
 
 
         HConnection connection = HConnectionManager.createConnection(config);
-        HTable customerTable = new HTable(TableName.valueOf(Bytes.toBytes(customerTableName)), connection);
+        HTable customerTable = new HTable(TableName.valueOf(Bytes.toBytes(tableName)), connection);
 
         Scan scan = new Scan(startKey,endKey);
 //        scan.addColumn(Bytes.toBytes(customerColumnFamilyName),Bytes.toBytes("C_ID")); //IF I ADD THIS THE FILTER DOES NOT WORK!
@@ -321,7 +392,7 @@ public class HBaseTPCC {
         for(String district : districtIds)
         {
             Filter filter = new SingleColumnValueFilter(
-              Bytes.toBytes(customerColumnFamilyName),
+              Bytes.toBytes(columnFamilyName),
                     Bytes.toBytes("C_D_ID"),
                     CompareFilter.CompareOp.EQUAL,
                     Bytes.toBytes(district)
@@ -336,7 +407,7 @@ public class HBaseTPCC {
         Result res = scanner.next();
         while (res != null && !res.isEmpty())
         {
-            byte[] customerID = res.getValue(Bytes.toBytes(customerColumnFamilyName), Bytes.toBytes("C_ID"));
+            byte[] customerID = res.getValue(Bytes.toBytes(columnFamilyName), Bytes.toBytes("C_ID"));
             customerIds.add(Integer.valueOf(new String(customerID, "US-ASCII")));
 
             res = scanner.next();
@@ -405,7 +476,22 @@ public class HBaseTPCC {
                 System.exit(-1);
             }
             //modified to print the size
+            Long startTs = System.currentTimeMillis();
             System.out.println("There are "+hBaseTPCC.query4(args[2], args[3].split(",")).size()+" customers that belong to warehouse "+args[2]+" of districts "+args[3]+".");
+            Long stopTs = System.currentTimeMillis();
+            System.out.println(String.format("Total wall time %dms", stopTs-startTs));
+        }
+        else if(args[1].toUpperCase().equals("QUERY5")){
+            if(args.length!=4){
+                System.out.println("Error: 1) ZK_HOST:ZK_PORT, 2) query3, " +
+                        "3) warehouseId 4) listOfDistrictIds");
+                System.exit(-1);
+            }
+            Long startTs = System.currentTimeMillis();
+            //modified to print the size
+            System.out.println("There are "+hBaseTPCC.query5(args[2], args[3].split(",")).size()+" customers that belong to warehouse "+args[2]+" of districts "+args[3]+".");
+            Long stopTs = System.currentTimeMillis();
+            System.out.println(String.format("Total wall time %dms", stopTs-startTs));
         }
         else{
             System.out.println("Error: 1) ZK_HOST:ZK_PORT, 2)action [createTables, loadTables, query1, query2, query3, query4], 3)Extra parameters for loadTables and queries:" +
@@ -420,6 +506,11 @@ public class HBaseTPCC {
     }
 
     void createTableWrapper(String tableNameString, String[] columnFamilyNameString, Integer[] maxVersions) throws IOException {
+        createTableWrapper(tableNameString, columnFamilyNameString, maxVersions, null);
+    }
+
+
+    void createTableWrapper(String tableNameString, String[] columnFamilyNameString, Integer[] maxVersions, byte [] [] splits) throws IOException {
         byte[] tableName = Bytes.toBytes(tableNameString);
         HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(tableName));
         for(int i =0 ; i < columnFamilyNameString.length; i++)
@@ -432,7 +523,13 @@ public class HBaseTPCC {
             tableDescriptor.addFamily(columnFamilyDescriptor);
         }
         try {
-            hBaseAdmin.createTable(tableDescriptor);
+            if (splits == null) {
+                hBaseAdmin.createTable(tableDescriptor);
+            }
+            else
+            {
+                hBaseAdmin.createTable(tableDescriptor, splits);
+            }
         }
         catch (TableExistsException ex)
         {
