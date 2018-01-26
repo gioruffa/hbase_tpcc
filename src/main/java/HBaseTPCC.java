@@ -247,7 +247,7 @@ public class HBaseTPCC {
 
         //TO IMPLEMENT
         System.out.println(String.format("The folder is %s", folder));
-        System.exit(-1);
+        System.exit(0);
     }
 
     /**
@@ -375,6 +375,7 @@ public class HBaseTPCC {
      * @throws IOException
      */
     public List<Integer> query4Generic(String warehouseId, String[] districtIds, String tableName, String columnFamilyName) throws IOException {
+        System.out.println(String.format("Query on table %s", tableName));
         List<Integer> customerIds = new LinkedList<>();
         //TO IMPLEMENT
         byte [] startKey = getKey(new String[] {warehouseId}, new int [] {0});
