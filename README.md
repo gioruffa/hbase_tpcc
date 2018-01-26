@@ -16,3 +16,8 @@ The query4 can be run from CLI in the same way as query4.
 
 We added some printout of the walltime to see if there is any speedup, but we where not able to record any.
 We think that the file is too small to have an impact on the full scan needed by the filter.
+
+# VERSION WITHOUT SPLITTING
+the version without the splitting can be obtained by cloning the git repo hosted here:  https://github.com/xmooner/hbase_tpcc
+and checking out on the tag "v1.0" with git checkout v1.0
+
